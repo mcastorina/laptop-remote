@@ -44,7 +44,8 @@ void setup(void) {
     digitalWrite(INTPIN, HIGH);
 
     // begin() with the addresses of each panel in order
-    trellis.begin(0x70);  // only one
+    trellis.begin(0x70);
+    trellis.setBrightness(3);   // 15 is max
 }
 
 aci_evt_opcode_t laststatus = ACI_EVT_DISCONNECTED;
@@ -80,43 +81,48 @@ void loop() {
     }
 
     if (status == ACI_EVT_CONNECTED) {
-#ifdef DEBUG
         // Lets see if there's any data for us!
         if (BTLEserial.available()) {
+#ifdef DEBUG
             Serial.print("* ");
             Serial.print(BTLEserial.available());
             Serial.println(F(" bytes available from BTLE"));
-        }
 #endif
-        // Get characters
-        while (BTLEserial.available()) {
-            char c = BTLEserial.read();
+            // Get characters
+            while (BTLEserial.available()) {
+                char c = BTLEserial.read();
 #ifdef DEBUG
-            Serial.print(c);
+                Serial.print(c);
 #endif
-        }
+                // FIXME: use full byte for each
+                // lower nibble is address
+                // upper nibble is value
+                uint8_t led = c & 0x0f;
+                uint8_t val = (c & 0xf0) >> 4;
 
-        // FIXME: change to use buttons
-        if (trellis.readSwitches()) {
-            uint8_t cmd = 0xff;
-            // Go through every button
-            for (int i = 0; i < NUMKEYS; i++) {
-                if (trellis.justPressed(i)) {
-                    cmd = i;
-#ifdef DEBUG
-                    Serial.print(F("* Button pressed -> "));
-                    if (cmd >= 10) Serial.print((char)((cmd/10) + 0x30));
-                    Serial.println((char)((cmd%10) + 0x30));
-#endif
-                    if (trellis.isLED(cmd)) trellis.clrLED(cmd);
-                    else                    trellis.setLED(cmd);
-
-                    trellis.writeDisplay();
-                    break;
-                }
+                if (val) trellis.setLED(led);
+                else     trellis.clrLED(led);
             }
-            if (cmd != 0xff) {
+            trellis.writeDisplay();
+        }
+
+        // Go through every button update LEDs
+        if (trellis.readSwitches()) {
+            for (int i = 0; i < NUMKEYS; i++) {
+                if (trellis.isKeyPressed(i))    trellis.setLED(i);
+                else                            trellis.clrLED(i);
+            }
+            trellis.writeDisplay();
+        }
+
+        // Go through every button
+        for (int i = 0; i < NUMKEYS; i++) {
+            if (trellis.isKeyPressed(i)) {
+                uint8_t cmd = i;
 #ifdef DEBUG
+                Serial.print(F("* Button pressed -> "));
+                if (cmd >= 10) Serial.print((char)((cmd/10) + 0x30));
+                Serial.println((char)((cmd%10) + 0x30));
                 Serial.print(F("* Sending -> \""));
                 Serial.print((char)(cmd + 0x30));
                 Serial.println("\"");
