@@ -78,8 +78,10 @@ declare -A receiver_map=(
 )
 ################################################################################
 
+CMD="$0 $@"
 GATT_OPTS="--device=$BLE_MAC --addr-type=random"
 GATT_READ_OPTS="--char-write-req --handle=0x0e --value=0100 --listen"
+GATT_HB_OPTS="--char-read --handle=0x03"    # read name
 
 function receiver_callback {
     if [[ $DEBUG == 1 ]]; then
@@ -90,12 +92,30 @@ function receiver_callback {
         ${receiver_map[$1]}
     fi
 }
+function receiver_heartbeat {
+    while [[ 1 ]]; do
+        sleep 5
+        timeout 3 gatttool $GATT_OPTS $GATT_HB_OPTS &> /dev/null
+        # return code of 124 if timeout, 0 if successful
+        # the gatttool should fail because the resource is busy (i.e. it
+        # is already connected)
+        if [[ $? == 124 || $? == 0 ]]; then
+            echo "Controller disconnected... Restarting"
+            exec $CMD
+            exit 0
+        elif [[ $DEBUG == 1 ]]; then
+            echo "<3"
+        fi
+    done
+}
 
 # gatttool will loop forever
 # this loop will call receiver_callback when it receives a value
-gatttool $GATT_OPTS $GATT_READ_OPTS | while read -r line; do
+gatttool $GATT_OPTS $GATT_READ_OPTS 2> /dev/null | while read -r line; do
     if [[ $line =~ "Characteristic value was written successfully" ]]; then
         echo "Connected successfully"
+        # start heartbeat
+        receiver_heartbeat &
     elif [[ $line =~ "Notification handle = 0x000d value:" ]]; then
         if [[ $line =~ ([0-9a-f][0-9a-f])$ ]]; then
             receiver_callback ${BASH_REMATCH[1]}
@@ -106,3 +126,9 @@ gatttool $GATT_OPTS $GATT_READ_OPTS | while read -r line; do
         fi
     fi
 done
+
+# only reaches this point when gatttool is waiting for a connection and
+# times out (after ~40 seconds)
+echo "Connection refused... Retrying"
+exec $CMD
+exit 0
