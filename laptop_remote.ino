@@ -28,6 +28,11 @@ Adafruit_TrellisSet trellis = Adafruit_TrellisSet(&matrix0);
 Adafruit_BLE_UART BTLEserial =
     Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RDY, ADAFRUITBLE_RST);
 
+// array of times of our first presses of a key
+// used for keeping track of when to constantly send
+long first_presses[NUMKEYS];
+long global_count;
+
 void setup(void) {
 #ifdef DEBUG
     Serial.begin(115200);
@@ -46,6 +51,9 @@ void setup(void) {
     // begin() with the addresses of each panel in order
     trellis.begin(0x70);
     trellis.setBrightness(3);   // 15 is max
+
+    // count used for button timing, increases every loop()
+    global_count = 0;
 }
 
 aci_evt_opcode_t laststatus = ACI_EVT_DISCONNECTED;
@@ -119,19 +127,35 @@ void loop() {
         for (int i = 0; i < NUMKEYS; i++) {
             if (trellis.isKeyPressed(i)) {
                 uint8_t cmd = i;
+                if (trellis.justPressed(i)) {
+                    first_presses[cmd] = global_count;
+
+                    // write the data
+                    BTLEserial.write(&cmd, 1);
+#ifdef DEBUG
+                    Serial.print(F("* Sending -> \""));
+                    Serial.print((char)(cmd + 0x30));
+                    Serial.println("\"");
+#endif
+                }
+                else if (first_presses[cmd] < global_count - 20) {
+                    // write the data if it has been ~600 ms since first press
+                    BTLEserial.write(&cmd, 1);
+#ifdef DEBUG
+                    Serial.print(F("* Sending -> \""));
+                    Serial.print((char)(cmd + 0x30));
+                    Serial.println("\"");
+#endif
+                }
 #ifdef DEBUG
                 Serial.print(F("* Button pressed -> "));
                 if (cmd >= 10) Serial.print((char)((cmd/10) + 0x30));
                 Serial.println((char)((cmd%10) + 0x30));
-                Serial.print(F("* Sending -> \""));
-                Serial.print((char)(cmd + 0x30));
-                Serial.println("\"");
 #endif
-                // write the data
-                BTLEserial.write(&cmd, 1);
             }
         }
     }
+    global_count++;
     delay(30);  // 30ms delay is required for Trellis
 }
 
