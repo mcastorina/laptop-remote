@@ -98,15 +98,15 @@ void loop() {
 #endif
             // Get characters
             while (BTLEserial.available()) {
-                char c = BTLEserial.read();
+                char data = 0;
+                char cmd = BTLEserial.read();
+                if (BTLEserial.available())
+                    data = BTLEserial.read();
 #ifdef DEBUG
-                Serial.print(c);
+                Serial.print(cmd + " : " + data);
 #endif
-                // FIXME: use full byte for each
-                // lower nibble is address
-                // upper nibble is value
-                uint8_t led = c & 0x0f;
-                uint8_t val = (c & 0xf0) >> 4;
+                uint8_t led = cmd;
+                uint8_t val = data;
 
                 if (val) trellis.setLED(led);
                 else     trellis.clrLED(led);

@@ -7,7 +7,7 @@ BLE_MAC=FC:28:32:08:E0:B3
 #
 # button map
 #   ------------------  ------------------
-#   | 00  01  02  03 |  | qq  ww  ii  pp |
+#   | 00  01  02  03 |  | qq  ww  ii  dd |
 #   | 04  05  06  07 |  | aa  ss  dd  ++ |
 #   | 08  09  0a  0b |  | ff  w-  w+  -- |
 #   | 0c  0d  0e  0f |  | su  <<  >>  pp |
@@ -15,14 +15,15 @@ BLE_MAC=FC:28:32:08:E0:B3
 
 function receiver_browse {
     # if we're in mpv, press o (to display time)
-    # otherwise, spawn a browser
+    # otherwise, spawn a file browser
     if [[ $(xdotool getwindowfocus getwindowname) =~ "mpv" ]]; then
         xdotool key o
     else
-        urxvt -e ranger ~ &
+        urxvt -fn "xft:DejaVu Sans Mono:size=24" -e ranger ~ &
     fi
 }
 function receiver_cycle_win {
+    # cycle through open windows
     let "num_desktops = $(xdotool get_num_desktops)"
     let "cur_win = $(xdotool getwindowfocus)"
     let "cur_desktop = $(xdotool get_desktop)"
@@ -53,8 +54,7 @@ function receiver_cycle_win {
     }
 
     # set focus to next
-    xdotool set_desktop $(xdotool get_desktop_for_window ${wins[$next]}) && \
-        xdotool windowfocus ${wins[$next]}
+    xdotool windowactivate ${wins[$next]}
 }
 
 # map of button to command
@@ -62,7 +62,7 @@ declare -A receiver_map=(
     ["00"]="xdotool key q"
     ["01"]="xdotool key k"
     ["02"]="receiver_browse"
-    ["03"]="xdotool key p"
+    ["03"]="xdotool key alt+0"
     ["04"]="xdotool key h"
     ["05"]="xdotool key j"
     ["06"]="xdotool key l"
